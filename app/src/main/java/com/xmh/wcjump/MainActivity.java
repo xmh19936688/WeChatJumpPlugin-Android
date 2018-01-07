@@ -1,9 +1,7 @@
 package com.xmh.wcjump;
 
-import android.annotation.TargetApi;
 import android.graphics.PixelFormat;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Gravity;
@@ -13,42 +11,53 @@ import android.view.WindowManager;
 
 public class MainActivity extends AppCompatActivity {
 
+    private int windowWidth;
+    private int windowHeight;
+    private View windowView;
+    private boolean isWindowShowing = false;
+
+    private int clickX;
+    private int clickY;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        checkAndGetPermission();
-
-
-        findViewById(R.id.v).setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View view, MotionEvent motionEvent) {
-                Log.e("xmh", "touch");
-                return false;
-            }
-        });
-
-        // 获取屏幕尺寸
+        // 计算窗口尺寸
         int screenWidth = getWindowManager().getDefaultDisplay().getWidth();
         int screenHeight = getWindowManager().getDefaultDisplay().getHeight();
+        windowWidth = screenWidth;
+        windowHeight = screenHeight * 2 / 3;
 
         // 计算点击坐标
-        int x = screenWidth / 2;
-        int y = screenHeight * 5 / 6;
+        clickX = screenWidth / 2;
+        clickY = screenHeight * 5 / 6;
 
-        WindowManager windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
+        initWindow();
+
+        findViewById(R.id.v).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleWindow();
+            }
+        });
+    }
+
+    private void initWindow() {
         WindowManager.LayoutParams params = new WindowManager.LayoutParams();
         params.type = WindowManager.LayoutParams.TYPE_TOAST;
-//        params.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         params.format = PixelFormat.TRANSLUCENT;
         params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
         params.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
-        params.width = screenWidth;
-        params.height = screenHeight * 2 / 3;
+        params.width = windowWidth;
+        params.height = windowHeight;
 
-        View view = View.inflate(this, R.layout.window, null);
-        view.findViewById(R.id.control).setOnTouchListener(new View.OnTouchListener() {
+        windowView = View.inflate(this, R.layout.window, null);
+        windowView.setTag("max");
+        windowView.setLayoutParams(params);
+
+        windowView.findViewById(R.id.control).setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
                 int action = motionEvent.getActionMasked();
@@ -59,24 +68,74 @@ public class MainActivity extends AppCompatActivity {
                 float x = motionEvent.getX();
                 float y = motionEvent.getY();
                 Log.e("xmh", "touch2||" + "action:" + MotionEvent.actionToString(action) + x + "*" + y);
-
                 return true;
             }
         });
-        view.findViewById(R.id.close).setOnClickListener(new View.OnClickListener() {
+        windowView.findViewById(R.id.close).setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view) {
-                WindowManager windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
-                windowManager.removeViewImmediate(view);
+            public void onClick(View v) {
+                toggleWindow();
             }
         });
-        windowManager.addView(view, params);
-
+        windowView.findViewById(R.id.left).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                View parent = (View) v.getParent();
+                WindowManager.LayoutParams params = (WindowManager.LayoutParams) parent.getLayoutParams();
+                if (parent.getTag().equals("max")) {
+                    parent.setTag("min");
+                    params.gravity = Gravity.LEFT | Gravity.TOP;
+                    params.width = v.getWidth();
+                    params.height = v.getHeight();
+                    parent.findViewById(R.id.right).setVisibility(View.GONE);
+                    parent.findViewById(R.id.close).setVisibility(View.GONE);
+                } else {
+                    parent.setTag("max");
+                    params.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
+                    params.width = windowWidth;
+                    params.height = windowHeight;
+                    parent.findViewById(R.id.right).setVisibility(View.VISIBLE);
+                    parent.findViewById(R.id.close).setVisibility(View.VISIBLE);
+                }
+                WindowManager windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
+                windowManager.updateViewLayout(parent, params);
+            }
+        });
+        windowView.findViewById(R.id.right).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                View parent = (View) v.getParent();
+                WindowManager.LayoutParams params = (WindowManager.LayoutParams) parent.getLayoutParams();
+                if (parent.getTag().equals("max")) {
+                    parent.setTag("min");
+                    params.gravity = Gravity.RIGHT | Gravity.TOP;
+                    params.width = v.getWidth();
+                    params.height = v.getHeight();
+                    parent.findViewById(R.id.left).setVisibility(View.GONE);
+                    parent.findViewById(R.id.close).setVisibility(View.GONE);
+                } else {
+                    parent.setTag("max");
+                    params.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
+                    params.width = windowWidth;
+                    params.height = windowHeight;
+                    parent.findViewById(R.id.left).setVisibility(View.VISIBLE);
+                    parent.findViewById(R.id.close).setVisibility(View.VISIBLE);
+                }
+                WindowManager windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
+                windowManager.updateViewLayout(parent, params);
+            }
+        });
     }
 
-    @TargetApi(23)
-    private void checkAndGetPermission() {
-        if (!Settings.canDrawOverlays(this)) {
+    private void toggleWindow() {
+        if (isWindowShowing) {
+            isWindowShowing = false;
+            WindowManager windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
+            windowManager.removeViewImmediate(windowView);
+        } else {
+            isWindowShowing = true;
+            WindowManager windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
+            windowManager.addView(windowView, windowView.getLayoutParams());
         }
     }
 
