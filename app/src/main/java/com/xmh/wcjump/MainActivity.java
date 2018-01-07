@@ -1,5 +1,6 @@
 package com.xmh.wcjump;
 
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -8,19 +9,21 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.TextView;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String IP = "192.168.42.87";
+    private static final String IP = "192.168.42.178";
 
     // 悬浮框
     private int windowWidth;
     private int windowHeight;
-    private View windowView;
     private boolean isWindowShowing = false;
+    private View windowView;
+    private TextView info;
 
     // 点击位置
     private int clickX;
@@ -53,7 +56,9 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**初始化悬浮窗*/
+    /**
+     * 初始化悬浮窗
+     */
     private void initWindow() {
         // layout params
         WindowManager.LayoutParams params = new WindowManager.LayoutParams();
@@ -66,41 +71,12 @@ public class MainActivity extends AppCompatActivity {
 
         // inflate view
         windowView = View.inflate(this, R.layout.window, null);
+        info = windowView.findViewById(R.id.info);
         windowView.setTag("max");
         windowView.setLayoutParams(params);
 
-        // handle touch
-        windowView.findViewById(R.id.control).setOnTouchListener(new View.OnTouchListener() {
-
-            // click position
-            private float startX;
-            private float startY;
-            private float endX;
-            private float endY;
-
-            @Override
-            public boolean onTouch(View view, MotionEvent motionEvent) {
-                int action = motionEvent.getActionMasked();
-                if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_UP) {
-                    return false;
-                }
-
-                // start x y
-                if (action == MotionEvent.ACTION_DOWN) {
-                    startX = motionEvent.getX();
-                    startY = motionEvent.getY();
-                }
-                // end x y
-                if (action == MotionEvent.ACTION_UP) {
-                    endX = motionEvent.getX();
-                    endY = motionEvent.getY();
-                    int delta = (int) Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-                    // send to server
-                    send(delta);
-                }
-                return true;
-            }
-        });
+        // 监听悬浮窗触控
+        windowView.findViewById(R.id.control).setOnTouchListener(new OnControlTouchListener());
 
         // 开启/关闭悬浮窗
         windowView.findViewById(R.id.close).setOnClickListener(new View.OnClickListener() {
@@ -123,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
                     params.height = v.getHeight();
                     parent.findViewById(R.id.right).setVisibility(View.GONE);
                     parent.findViewById(R.id.close).setVisibility(View.GONE);
+                    info.setVisibility(View.GONE);
                 } else {
                     parent.setTag("max");
                     params.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
@@ -130,6 +107,7 @@ public class MainActivity extends AppCompatActivity {
                     params.height = windowHeight;
                     parent.findViewById(R.id.right).setVisibility(View.VISIBLE);
                     parent.findViewById(R.id.close).setVisibility(View.VISIBLE);
+                    info.setVisibility(View.VISIBLE);
                 }
                 WindowManager windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
                 windowManager.updateViewLayout(parent, params);
@@ -149,6 +127,7 @@ public class MainActivity extends AppCompatActivity {
                     params.height = v.getHeight();
                     parent.findViewById(R.id.left).setVisibility(View.GONE);
                     parent.findViewById(R.id.close).setVisibility(View.GONE);
+                    info.setVisibility(View.GONE);
                 } else {
                     parent.setTag("max");
                     params.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
@@ -156,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
                     params.height = windowHeight;
                     parent.findViewById(R.id.left).setVisibility(View.VISIBLE);
                     parent.findViewById(R.id.close).setVisibility(View.VISIBLE);
+                    info.setVisibility(View.VISIBLE);
                 }
                 WindowManager windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
                 windowManager.updateViewLayout(parent, params);
@@ -163,7 +143,9 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**开启/关闭悬浮窗*/
+    /**
+     * 开启/关闭悬浮窗
+     */
     private void toggleWindow() {
         if (isWindowShowing) {
             isWindowShowing = false;
@@ -176,8 +158,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**向server发数据*/
-    private void send(final int delta) {
+    /**
+     * 向server发跳跃数据
+     */
+    private void sendJump(final int delta) {
+        info.setTextColor(Color.YELLOW);
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -188,7 +173,6 @@ public class MainActivity extends AppCompatActivity {
                     sb.append("?x=").append(clickX);
                     sb.append("&y=").append((clickY));
                     sb.append("&d=").append(delta);
-                    Log.e("xmh", "url:" + sb.toString());
 
                     URL url = new URL(sb.toString());
                     conn = (HttpURLConnection) url.openConnection();
@@ -196,9 +180,25 @@ public class MainActivity extends AppCompatActivity {
                     conn.setDoOutput(false);
                     conn.setUseCaches(false);
                     conn.setRequestMethod("GET");
-                    int code = conn.getResponseCode();
-                    Log.e("xmh","resp:"+code);
 
+                    Log.e("xmh", "url:" + url);
+
+                    int code = conn.getResponseCode();
+                    if (code == 200) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                info.setTextColor(Color.GREEN);
+                            }
+                        });
+                    } else {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                info.setTextColor(Color.RED);
+                            }
+                        });
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
@@ -206,6 +206,105 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }).start();
+    }
+
+    /**
+     * 向server发校正数据
+     */
+    private void sendAdjust(final int delta) {
+        info.setTextColor(Color.YELLOW);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection conn = null;
+                try {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("http://").append(IP).append("/adjust");
+                    sb.append("?d=").append(delta);
+
+                    URL url = new URL(sb.toString());
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setDoInput(false);
+                    conn.setDoOutput(false);
+                    conn.setUseCaches(false);
+                    conn.setRequestMethod("GET");
+
+                    Log.e("xmh", "url:" + url);
+
+                    int code = conn.getResponseCode();
+                    if (code == 200) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                info.setTextColor(Color.GREEN);
+                            }
+                        });
+                    } else {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                info.setTextColor(Color.RED);
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
+
+    /**
+     * 悬浮窗触控
+     */
+    private class OnControlTouchListener implements View.OnTouchListener {
+
+        private static final int MODE_JUMP = 1;
+        private static final int MODE_ADJUST = -MODE_JUMP;
+        private int mode = MODE_JUMP;
+
+        // click position
+        private float startX;
+        private float startY;
+        private float endX;
+        private float endY;
+
+        @Override
+        public boolean onTouch(View view, MotionEvent motionEvent) {
+            int action = motionEvent.getActionMasked();
+            if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_UP) {
+                return false;
+            }
+
+            // start x y
+            if (action == MotionEvent.ACTION_DOWN) {
+                startX = motionEvent.getX();
+                startY = motionEvent.getY();
+            }
+            // end x y
+            if (action == MotionEvent.ACTION_UP) {
+                endX = motionEvent.getX();
+                endY = motionEvent.getY();
+
+                if (mode == MODE_JUMP) {
+                    int delta = (int) Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                    // send to server
+                    sendJump(delta);
+                    mode = -mode;
+                    info.setText("需要怎么调整");
+                } else if (mode == MODE_ADJUST) {
+                    int delta = (int) Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                    if (endY > startY) {
+                        delta = -delta;
+                    }
+                    // send to server
+                    sendAdjust(delta);
+                    mode = -mode;
+                    info.setText("需要怎么跳");
+                }
+            }
+            return true;
+        }
     }
 
 }
